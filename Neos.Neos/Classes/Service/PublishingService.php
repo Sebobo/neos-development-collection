@@ -35,7 +35,7 @@ class PublishingService extends \Neos\ContentRepository\Domain\Service\Publishin
      * @return void
      * @api
      */
-    public function publishNode(NodeInterface $node, Workspace $targetWorkspace = null)
+    public function publishNode(NodeInterface $node, Workspace $targetWorkspace = null): void
     {
         if ($targetWorkspace === null) {
             $targetWorkspace = $node->getWorkspace()->getBaseWorkspace();
@@ -47,7 +47,7 @@ class PublishingService extends \Neos\ContentRepository\Domain\Service\Publishin
         $nodeType = $node->getNodeType();
 
         if ($nodeType->isOfType('Neos.Neos:Document') || $nodeType->hasConfiguration('childNodes')) {
-            $nodes = array_merge($nodes, $this->collectAllContentChildNodes($node));
+            $this->collectAllContentChildNodes($node, $nodes, $node->getWorkspace());
         }
         $sourceWorkspace = $node->getWorkspace();
         $sourceWorkspace->publishNodes($nodes, $targetWorkspace);
@@ -62,18 +62,13 @@ class PublishingService extends \Neos\ContentRepository\Domain\Service\Publishin
      *
      * @param NodeInterface $node
      */
-    public function discardNode(NodeInterface $node)
+    public function discardNode(NodeInterface $node): void
     {
         $nodes = [$node];
         $nodeType = $node->getNodeType();
 
         if ($nodeType->isOfType('Neos.Neos:Document') || $nodeType->hasConfiguration('childNodes')) {
-            $nodes = array_filter(
-                array_merge($nodes, $this->collectAllContentChildNodes($node)),
-                function ($possiblyPublishableNode) use ($node) {
-                    return $possiblyPublishableNode->getWorkspace()->getName() === $node->getWorkspace()->getName();
-                }
-            );
+            $this->collectAllContentChildNodes($node, $nodes, $node->getWorkspace());
         }
 
         $this->discardNodes($nodes);
@@ -82,14 +77,17 @@ class PublishingService extends \Neos\ContentRepository\Domain\Service\Publishin
     /**
      * @param NodeInterface $parentNode
      * @param array $collectedNodes
-     * @return array
+     * @param Workspace $workspace
      */
-    protected function collectAllContentChildNodes(NodeInterface $parentNode, $collectedNodes = [])
+    protected function collectAllContentChildNodes(NodeInterface $parentNode, array &$collectedNodes, Workspace $workspace): void
     {
+        // !!! Alternative: only include auto created childnodes of type ContentCollection?
+        // !!! Verify: does this cause a performance issue when publishing lots of nodes with lots of content?
         foreach ($parentNode->getChildNodes('!Neos.Neos:Document') as $contentNode) {
-            $collectedNodes[] = $contentNode;
-            $collectedNodes = array_merge($collectedNodes, $this->collectAllContentChildNodes($contentNode));
+            if ($contentNode->getWorkspace()->getName() === $workspace->getName()) {
+                $collectedNodes[] = $contentNode;
+            }
+//            $this->collectAllContentChildNodes($contentNode, $collectedNodes, $workspace);
         }
-        return $collectedNodes;
     }
 }

@@ -209,6 +209,7 @@ class PublishingService implements PublishingServiceInterface
         $discardedNodeIdentifiers = [];
         foreach ($nodes as $node) {
             $this->doDiscardNode($node, $discardedNodeIdentifiers);
+            echo "discarding" . $node->getName() . "\n";
         }
     }
 
